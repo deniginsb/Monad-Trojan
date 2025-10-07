@@ -56,8 +56,8 @@ Real-time notifications when you receive tokens on Monad testnet:
 
 1. **Clone and setup:**
 ```bash
-git clone <your-repo>
-cd monad-trojan-bot
+git clone https://github.com/deniginsb/Monad-Trojan
+cd Monad-Trojan
 chmod +x setup.sh
 ./setup.sh
 ```
