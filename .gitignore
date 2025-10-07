@@ -1,0 +1,78 @@
+# Environment Variables
+.env
+
+# Database
+*.db
+*.db-journal
+
+# Node.js
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Development/Debug files (temporary docs)
+DEBUG_TEST.md
+DEPLOYMENT_COMPLETE.md
+FINAL_*
+FIXED_ISSUES.md
+FIX_RPC.md
+IMPLEMENTATION_STATUS.md
+RESTART_BOT.txt
+RUN_NOW.txt
+STATUS.md
+SUCCESS_SUMMARY.md
+update_main_transaction_flow.md
+update_main_buy_sell.py
+inject_handlers.py
+add_passphrase_handlers.py
+passphrase_handlers.py
+test_modules.py
+test_rpc.sh
+generate_key.py
+README_old.md

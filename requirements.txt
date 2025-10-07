@@ -1,0 +1,23 @@
+# Core Bot Dependencies
+python-telegram-bot==20.7
+
+# Blockchain Dependencies
+web3==6.11.3
+eth-account==0.10.0
+
+# Security & Encryption
+cryptography==41.0.7
+
+# Database
+SQLAlchemy==2.0.23
+
+# Environment & Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Web Scraping (for explorer price)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Additional Dependencies
+typing-extensions==4.9.0
