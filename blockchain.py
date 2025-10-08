@@ -13,23 +13,9 @@ from config import (
     MONAD_TESTNET_RPC_URL, DEX_ROUTER_ADDRESS, ERC20_ABI, 
     DEX_ROUTER_ABI, WETH_ADDRESS, NATIVE_CURRENCY, CHAIN_ID,
     GAS_PRICE_MODES, BLOCK_EXPLORER_API_URL, BLOCK_EXPLORER_API_KEY,
-    BLOCKVISION_API_KEY, ALCHEMY_MONAD_URL
+    BLOCKVISION_API_KEY, ALCHEMY_MONAD_URL,
+    VERIFIED_TOKENS, HIGH_VALUE_TOKENS  # Import from config (80 tokens!)
 )
-
-# Verified tokens on Monad Testnet (known legitimate tokens)
-VERIFIED_TOKENS = {
-    # Popular/Official tokens (add addresses as needed)
-    '0x760afe86e5de5fa0ee542fc7b7b713e1c5425701': 'WMON',  # Wrapped Monad
-    '0x8171e9861fb8a8c9acc59e414849a6400e60934a': 'WETH',  # Wrapped ETH
-    # Add more verified tokens here as needed
-}
-
-# High-value tokens that should get special treatment in portfolio
-HIGH_VALUE_TOKENS = {
-    'aprMON', 'gMON', 'shMON', 'sMON', 'stMON', 'WMON', 'FMON',
-    'WETH', 'WBTC', 'USDT', 'USDC', 'MAD', 'DYSN', 'sDYSN',
-    # Add more as identified
-}
 
 class BlockchainManager:
     """Manages all blockchain interactions"""
@@ -783,5 +769,78 @@ class BlockchainManager:
         except Exception as e:
             print(f"Error waiting for transaction: {e}")
             return False
+    
+    def send_token(self, token_address: str, recipient_address: str, amount: Decimal,
+                   wallet_address: str, private_key: str) -> Optional[Dict]:
+        """
+        Send ERC20 tokens to another address
+        
+        Args:
+            token_address: Token contract address
+            recipient_address: Recipient's wallet address  
+            amount: Amount of tokens to send
+            wallet_address: Sender's wallet address
+            private_key: Private key for signing
+            
+        Returns:
+            Dict with transaction info or None
+        """
+        private_key_to_delete = private_key
+        
+        try:
+            checksum_token = Web3.to_checksum_address(token_address)
+            checksum_recipient = Web3.to_checksum_address(recipient_address)
+            checksum_wallet = Web3.to_checksum_address(wallet_address)
+            
+            # Get token contract
+            token_contract = self.w3.eth.contract(address=checksum_token, abi=ERC20_ABI)
+            
+            # Get token decimals
+            decimals = token_contract.functions.decimals().call()
+            
+            # Convert amount to smallest unit
+            amount_in_smallest_unit = int(amount * Decimal(10 ** decimals))
+            
+            # Build transfer transaction
+            nonce = self.w3.eth.get_transaction_count(checksum_wallet)
+            
+            # Get gas price
+            gas_settings = GAS_PRICE_MODES.get('normal', GAS_PRICE_MODES['normal'])
+            max_fee = self.w3.to_wei(gas_settings['maxFeePerGas'], 'gwei')
+            max_priority = self.w3.to_wei(gas_settings['maxPriorityFeePerGas'], 'gwei')
+            
+            # Build transaction
+            transfer_txn = token_contract.functions.transfer(
+                checksum_recipient,
+                amount_in_smallest_unit
+            ).build_transaction({
+                'from': checksum_wallet,
+                'nonce': nonce,
+                'maxFeePerGas': max_fee,
+                'maxPriorityFeePerGas': max_priority,
+                'gas': 100000,
+                'chainId': CHAIN_ID
+            })
+            
+            # Sign and send
+            signed_txn = self.w3.eth.account.sign_transaction(transfer_txn, private_key_to_delete)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            
+            result = {
+                'tx_hash': tx_hash.hex(),
+                'amount': str(amount),
+                'recipient': recipient_address
+            }
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error sending token: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+        finally:
+            private_key_to_delete = None
+            del private_key_to_delete
 
 blockchain_manager = BlockchainManager()

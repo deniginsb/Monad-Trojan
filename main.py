@@ -24,6 +24,13 @@ from database import db_manager
 from blockchain import blockchain_manager
 from security_passphrase import validate_passphrase
 from portfolio import get_portfolio_text
+from send_receive_handlers import (
+    handle_send_token, handle_send_select_token,
+    handle_send_address_input, handle_send_amount_input,
+    handle_send_passphrase_input, handle_receive_token,
+    cancel_send, AWAITING_SEND_ADDRESS, AWAITING_SEND_AMOUNT,
+    AWAITING_SEND_PASSPHRASE
+)
 
 # Conversation states
 AWAITING_TOKEN_ADDRESS = 1
@@ -36,6 +43,9 @@ AWAITING_SELL_CUSTOM_AMOUNT = 7
 AWAITING_SET_PASSPHRASE = 8
 AWAITING_CONFIRM_PASSPHRASE = 9
 AWAITING_TRANSACTION_PASSPHRASE = 10
+AWAITING_SEND_ADDRESS = 11
+AWAITING_SEND_AMOUNT = 12
+AWAITING_SEND_PASSPHRASE = 13
 
 # Temporary storage for ongoing transactions
 user_context: Dict[int, Dict] = {}
@@ -63,6 +73,10 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🚀 Buy Token", callback_data="buy_token"),
             InlineKeyboardButton("💹 Sell Token", callback_data="sell_token")
+        ],
+        [
+            InlineKeyboardButton("📤 Send Token", callback_data="send_token"),
+            InlineKeyboardButton("📥 Receive", callback_data="receive_token")
         ],
         [
             InlineKeyboardButton("💼 My Wallet", callback_data="wallet"),
@@ -197,6 +211,11 @@ async def show_wallet_info(update: Update, context: ContextTypes.DEFAULT_TYPE, e
             if symbol == 'MON' or symbol == 'MONAD':
                 native_balance = balance
             
+            # ONLY show verified tokens (filter non-verified)
+            verified = token_data.get('verified', False)
+            if not verified:
+                continue  # Skip non-verified tokens completely
+            
             # Format balance
             if balance < Decimal('0.0001'):
                 balance_str = f"{balance:.8f}"
@@ -208,11 +227,7 @@ async def show_wallet_info(update: Update, context: ContextTypes.DEFAULT_TYPE, e
             symbol_esc = escape_markdown(symbol)
             balance_esc = escape_markdown(balance_str)
             
-            # Add verified badge
-            verified = token_data.get('verified', False)
-            badge = " ✓" if verified else ""
-            
-            token_list += f"   • {balance_esc} {symbol_esc}{badge}\n"
+            token_list += f"   • {balance_esc} {symbol_esc}\n"
     else:
         token_list = "   _No tokens yet_\n"
     
@@ -245,15 +260,35 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
     data = query.data
     
+    print(f"🔵 button_callback: {data}")
+    
     await query.answer()
     
     if data == "main_menu":
-        await safe_edit_message(
-            query,
-            WELCOME_MESSAGE,
-            parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=get_main_menu_keyboard()
-        )
+        menu_text = "🏠 *Main Menu*\n\nSelect an action:"
+        
+        # Check if message is a photo (from receive QR code)
+        if query.message.photo:
+            # Photo message - delete and send new text message
+            try:
+                await query.message.delete()
+            except:
+                pass
+            
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=menu_text,
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+        else:
+            # Normal text message - edit it
+            await safe_edit_message(
+                query,
+                menu_text,
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=get_main_menu_keyboard()
+            )
         return ConversationHandler.END
     
     elif data == "import_wallet_first":
@@ -821,12 +856,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return ConversationHandler.END
     
+    elif data == "send_token":
+        await handle_send_token(update, context)
+        return ConversationHandler.END
+    
+    # send_select_* is handled at the top of function - skip here
+    
+    elif data == "receive_token":
+        await handle_receive_token(update, context)
+        return ConversationHandler.END
+    
     elif data == "help":
         help_text = (
             "❓ *Bantuan MonadTrojan Bot*\n\n"
             "*Fitur Utama:*\n"
             "🚀 *Buy Token* \\- Beli token ERC\\-20 dengan MONAD\n"
             "💹 *Sell Token* \\- Sell tokens to get MONAD\n"
+            "📤 *Send Token* \\- Kirim token ke address lain\n"
+            "📥 *Receive* \\- Terima token \\(show address \\+ QR\\)\n"
             "💼 *Wallet* \\- Manage wallet and check balance\n"
             "⚙️ *Settings* \\- Atur slippage, gas, dan anti\\-MEV\n\n"
             "*Security:*\n"
@@ -1018,7 +1065,7 @@ async def handle_buy_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return ConversationHandler.END
 
 async def handle_private_key_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle private key import - ask user to choose security mode"""
+    """Handle private key import - directly save without passphrase"""
     user_id = update.effective_user.id
     private_key = update.message.text.strip()
     
@@ -1033,33 +1080,26 @@ async def handle_private_key_import(update: Update, context: ContextTypes.DEFAUL
         )
         return AWAITING_PRIVATE_KEY
     
-    # Store temporarily for next step
-    context.user_data['pending_private_key'] = private_key
-    context.user_data['pending_address'] = address
+    # Save directly without passphrase (encrypted with master key)
+    db_manager.update_user_wallet(user_id, address, private_key, passphrase=None)
     
-    # Ask user to choose security mode
-    keyboard = [
-        [InlineKeyboardButton("🚀 Quick Mode (Simple)", callback_data="import_mode_quick")],
-        [InlineKeyboardButton("🔐 Secure Mode (Passphrase)", callback_data="import_mode_secure")],
-    ]
+    # Clear private key from memory
+    del private_key
     
     await update.message.reply_text(
-        "🔒 *Choose Security Mode*\n\n"
-        "*Quick Mode:*\n"
-        "• Fast and easy\n"
-        "• Encrypted with master key\n"
-        "• Good for testnet\n\n"
-        "*Secure Mode:*\n"
-        "• Zero\\-knowledge encryption\n"
-        "• Protected by YOUR passphrase\n"
-        "• Developer CANNOT access your key\n"
-        "• ⚠️ Forget passphrase = LOST FOREVER\n\n"
-        "Which mode do you prefer?",
+        f"✅ *Wallet Imported Successfully\\!*\n\n"
+        f"📍 Address: `{escape_markdown(address[:10])}...{escape_markdown(address[-8:])}`\n\n"
+        f"🚀 Your wallet is ready\\!\n"
+        f"🔐 Private key encrypted securely\n\n"
+        f"You can now:\n"
+        f"• Buy & sell tokens\n"
+        f"• Send & receive\n"
+        f"• Check portfolio",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=get_main_menu_keyboard()
     )
     
-    return AWAITING_PRIVATE_KEY
+    return ConversationHandler.END
 
 async def handle_buy_custom_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle custom buy amount input from user"""
@@ -1467,7 +1507,8 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
-            CallbackQueryHandler(button_callback)
+            # Add button_callback for conversation-starting callbacks only
+            CallbackQueryHandler(button_callback, pattern=r'^(import_wallet|import_wallet_first|import_mode_|toggle_|refresh_balance|wallet|settings|portfolio|help|buy_token|buy_custom|sell_token|sell_custom|main_menu|show_private_key|confirm_show_pk|create_new_wallet)'),
         ],
         states={
             AWAITING_TOKEN_ADDRESS: [
@@ -1496,10 +1537,30 @@ def main():
         allow_reentry=True
     )
     
+    # Send token conversation handler (no passphrase needed)
+    send_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handle_send_select_token, pattern=r'^send_select_')
+        ],
+        states={
+            AWAITING_SEND_ADDRESS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_send_address_input)
+            ],
+            AWAITING_SEND_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_send_amount_input)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel_send)],
+        allow_reentry=True,
+        per_message=False
+    )
+    
     application.add_handler(conv_handler)
+    application.add_handler(send_conv_handler)  # Must be before button_callback
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CallbackQueryHandler(handle_buy_amount, pattern=r'^buy_'))
-    application.add_handler(CallbackQueryHandler(button_callback))
+    # button_callback should NOT handle send_select_* - use negative lookahead
+    application.add_handler(CallbackQueryHandler(button_callback, pattern=r'^(?!send_select_)'))
     
     print("✅ Bot started successfully!")
     print("🔗 Monad Testnet RPC:", MONAD_TESTNET_RPC_URL)

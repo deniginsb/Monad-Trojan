@@ -122,8 +122,13 @@ async def send_token_notification(bot: Bot, user_id: int, new_tokens: List[Dict]
             
             message += f"\n*Amount:* `{escape_markdown(f'{balance:.4f}')} {escape_markdown(symbol)}`\n"
             
-            # Add explorer link if available
-            if address and BLOCK_EXPLORER_URL:
+            # Add explorer link for transaction (TX hash preferred)
+            tx_hash = token.get('tx_hash')
+            if tx_hash and BLOCK_EXPLORER_URL:
+                explorer_link = f"{BLOCK_EXPLORER_URL}/tx/{tx_hash}"
+                message += f"\n🔗 [View Transaction]({explorer_link})"
+            elif address and BLOCK_EXPLORER_URL:
+                # Fallback to token page if no TX found
                 explorer_link = f"{BLOCK_EXPLORER_URL}/token/{address}"
                 message += f"\n🔗 [View on Explorer]({explorer_link})"
         
@@ -245,6 +250,41 @@ async def check_user_for_new_tokens(bot: Bot, user, wallet_address: str):
                 balance = token_data.get('balance', 0)
                 print(f"  ✅ New verified token qualifies: {symbol}, balance={balance}")
                 if balance > 0:
+                    # Try to find TX hash for new token received
+                    try:
+                        import requests
+                        from config import ALCHEMY_MONAD_URL
+                        
+                        payload = {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "alchemy_getAssetTransfers",
+                            "params": [{
+                                "toAddress": wallet_address,
+                                "category": ["erc20"],
+                                "order": "desc",
+                                "maxCount": "0x5",
+                                "withMetadata": True
+                            }]
+                        }
+                        
+                        response = requests.post(ALCHEMY_MONAD_URL, json=payload, timeout=5)
+                        
+                        if response.ok:
+                            data = response.json()
+                            if 'result' in data:
+                                transfers = data['result'].get('transfers', [])
+                                token_address = token_data.get('address', '').lower()
+                                
+                                for tx in transfers:
+                                    tx_token = tx.get('rawContract', {}).get('address', '').lower()
+                                    if tx_token == token_address:
+                                        token_data['tx_hash'] = tx.get('hash')
+                                        print(f"  🔔 Found TX for new token: {tx.get('hash')}")
+                                        break
+                    except Exception as e:
+                        print(f"  ⚠️ Could not fetch TX for new token: {e}")
+                    
                     new_tokens.append(token_data)
                     print(f"🔔 New verified token detected for user {telegram_id}: {symbol} ({balance})")
                 else:
