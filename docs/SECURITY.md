@@ -2,7 +2,13 @@
 
 ## Overview
 
-MonadTrojan Bot implements **enterprise-grade security** to protect your private keys. This document explains the cryptographic design and security measures.
+MonadTrojan Bot implements **enterprise-grade security** to protect your private keys. We now offer three security modes to match your needs:
+
+1. **Standard Mode** - Fast and convenient (master key encryption)
+2. **Password Mode** - Extra layer with passphrase
+3. **Hybrid Mode** - Zero-knowledge with RSA + AES (recommended!)
+
+This document explains the cryptographic design behind each mode.
 
 ## Encryption Stack
 
@@ -82,13 +88,13 @@ encrypted_twice = fernet_passphrase.encrypt(encrypted_once)
 
 ## Security Modes
 
-### Quick Mode
+### Standard Mode (formerly Quick Mode)
 
 **Encryption**: Master key only  
-**Speed**: Instant (no passphrase prompt)  
+**Speed**: Instant (no password prompt)  
 **Security**: Medium (server has master key)
 
-**Use case**: Testing, small amounts
+**Use case**: Testing, small amounts on testnet
 
 ```
 ┌────────────────┐
@@ -105,13 +111,13 @@ encrypted_twice = fernet_passphrase.encrypt(encrypted_once)
 └────────────────┘
 ```
 
-### Secure Mode
+### Password Mode (formerly Secure Mode)
 
 **Encryption**: Master key + User passphrase  
 **Speed**: Prompt before each transaction  
-**Security**: High (zero-knowledge)
+**Security**: High (but server can partially decrypt)
 
-**Use case**: Production, large amounts
+**Use case**: Medium security, legacy option
 
 ```
 ┌────────────────┐
@@ -130,6 +136,38 @@ encrypted_twice = fernet_passphrase.encrypt(encrypted_once)
 │  Encrypted     │
 └────────────────┘
 ```
+
+### Hybrid Mode (NEW! - Recommended)
+
+**Encryption**: RSA-4096 + AES-256-GCM + Password  
+**Speed**: Cached password (optional)  
+**Security**: Maximum (true zero-knowledge)
+
+**Use case**: Production, all amounts, maximum security
+
+```
+┌────────────────┐
+│  Private Key   │
+└────────┬───────┘
+         │
+    [AES-256-GCM]
+    Random Key
+         │
+    [RSA-4096]
+    Public Key
+         │
+    [AES-256-GCM]
+    Password
+         │
+         ▼
+┌────────────────┐
+│  Triple        │
+│  Encrypted     │
+│  (unbreakable!)│
+└────────────────┘
+```
+
+**Key Difference**: In Hybrid mode, your RSA private key is encrypted with YOUR password only. Server never has access to decrypt it, making it truly zero-knowledge.
 
 ## Key Storage
 

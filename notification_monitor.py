@@ -187,8 +187,9 @@ async def check_user_for_new_tokens(bot: Bot, user, wallet_address: str):
                 if not is_new and symbol in last_snapshot:
                     old_balance = float(last_snapshot[symbol].get('balance', 0))
                     new_balance = float(token_data.get('balance', 0))
-                    # Only notify if balance increased (received MON)
-                    if new_balance > old_balance:
+                    # Only notify if balance increased significantly (ignore precision errors)
+                    # Minimum threshold: 0.0001 MON to avoid false positives
+                    if new_balance > old_balance + 0.0001:
                         balance_increase = new_balance - old_balance
                         token_data['balance_increase'] = balance_increase
                         
@@ -290,10 +291,11 @@ async def check_user_for_new_tokens(bot: Bot, user, wallet_address: str):
                 else:
                     print(f"  ⚠️ Skipped: balance is 0")
             elif symbol in last_snapshot:
-                # Existing token - check if balance increased
+                # Existing token - check if balance increased significantly
                 old_balance = float(last_snapshot[symbol].get('balance', 0))
                 new_balance = float(token_data.get('balance', 0))
-                if new_balance > old_balance:
+                # Minimum threshold: 0.0001 to avoid false positives from precision errors
+                if new_balance > old_balance + 0.0001:
                     balance_increase = new_balance - old_balance
                     token_data['balance_increase'] = balance_increase
                     

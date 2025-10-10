@@ -31,6 +31,7 @@ from send_receive_handlers import (
     cancel_send, AWAITING_SEND_ADDRESS, AWAITING_SEND_AMOUNT,
     AWAITING_SEND_PASSPHRASE
 )
+from nft_handlers import handle_show_nfts, handle_nft_pagination
 
 # Conversation states
 AWAITING_TOKEN_ADDRESS = 1
@@ -83,8 +84,11 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")
         ],
         [
-            InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
+            InlineKeyboardButton("🖼️ My NFTs", callback_data="nfts"),
             InlineKeyboardButton("❓ Help", callback_data="help")
+        ],
+        [
+            InlineKeyboardButton("⚙️ Settings", callback_data="settings")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -407,6 +411,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 ]])
             )
         
+        return ConversationHandler.END
+    
+    elif data == "nfts":
+        # Show NFT collection
+        await handle_show_nfts(update, context)
+        return ConversationHandler.END
+    
+    elif data.startswith("nft_page_"):
+        # Handle NFT pagination
+        await handle_nft_pagination(update, context)
         return ConversationHandler.END
     
     elif data == "buy_token":
@@ -875,6 +889,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "📤 *Send Token* \\- Kirim token ke address lain\n"
             "📥 *Receive* \\- Terima token \\(show address \\+ QR\\)\n"
             "💼 *Wallet* \\- Manage wallet and check balance\n"
+            "📊 *Portfolio* \\- View token allocation\n"
+            "🖼️ *My NFTs* \\- View NFT collection\n"
             "⚙️ *Settings* \\- Atur slippage, gas, dan anti\\-MEV\n\n"
             "*Security:*\n"
             "• Private key dienkripsi dengan AES\\-128\n"

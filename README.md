@@ -5,10 +5,14 @@ A Telegram bot for interacting with the Monad blockchain testnet. Built with Pyt
 ## ✨ Features
 
 ### 🔐 Secure Wallet Management
-- **Passphrase-based wallet creation** - Generate wallet from seed phrase with optional password
-- **Wallet import** - Import existing wallets via passphrase
+- **Three encryption modes** - Choose your security level:
+  - **Standard Mode** - Quick access, master key encryption
+  - **Password Mode** - Add passphrase for extra layer
+  - **Hybrid Mode (NEW!)** - Zero-knowledge RSA + AES encryption
+- **Wallet import** - Import existing wallets easily
 - **Balance checking** - Real-time MON and token balances
-- **Security features** - Encrypted storage with user-specific encryption
+- **Password caching** - Remember password for session or prompt each time (you choose!)
+- **Security features** - Your keys, your control
 
 ### 💰 Portfolio Management
 - **Real-time portfolio tracking** with USD values
@@ -97,7 +101,9 @@ python3 main.py
 **main.py** - Bot entry point and command handlers
 - Telegram bot initialization
 - Command routing
-- Conversation handlers
+- Conversation handlers with password flow
+- Transaction password prompts (buy/sell/send)
+- Show private key with mandatory password
 - Settings management
 
 **notification_monitor.py** - Background notification system (NEW!)
@@ -124,10 +130,28 @@ python3 main.py
 - Notification settings
 - Token snapshots for change detection
 
-**security.py** - Wallet security
+**security.py** - Wallet security (Standard/Password modes)
 - Passphrase-based key derivation
-- AES-256 encryption
-- Per-user encryption keys
+- AES-256 encryption with master key
+- Per-user salt generation
+
+**hybrid_encryption.py** - Zero-knowledge encryption (NEW!)
+- RSA-4096 keypair generation
+- AES-256-GCM data encryption
+- Password-protected private key backup
+- True end-to-end encryption (server can't decrypt!)
+
+**hybrid_handlers.py** - Hybrid encryption flows
+- Password setup for new users
+- Upgrade existing users to hybrid mode
+- RSA key backup (text + file format)
+- Password verification with retry
+
+**send_receive_handlers.py** - Token transfer handlers
+- Send tokens with password prompt
+- Receive token QR code generation
+- Native MON and ERC20 support
+- Password caching for convenience
 
 ### Scripts
 
@@ -220,7 +244,24 @@ PRICE_CACHE_TTL = 300  # 5 minutes
 
 ## 📝 Version History
 
-**v1.2.0** (Current)
+**v1.5.0** (Current) 
+- ✅ Hybrid encryption with RSA-4096 + AES-256-GCM
+- ✅ Zero-knowledge security (server can't decrypt)
+- ✅ Password caching with user choice
+- ✅ Unified password flow for all transactions
+- ✅ Show private key with mandatory re-auth
+- ✅ Send token with password support
+
+**v.1.4.0**
+- ✅ check nft
+
+**v1.3.0**
+- ✅ Send Token — easily transfer MON or any verified token
+- ✅ Receive Token — view your wallet
+
+
+
+**v1.2.0**
 - ✅ Complete notification system with TX hash links
 - ✅ MON + verified token notifications
 - ✅ Smart snapshot system (no spam)

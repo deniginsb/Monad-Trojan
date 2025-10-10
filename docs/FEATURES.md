@@ -4,15 +4,23 @@
 
 ### Buy Tokens
 - Quick buy amounts: 0.1, 0.5, 1.0, 5.0 MONAD
-- Custom amount support
-- Real-time price preview
+- Custom amount support (any value you want)
+- Real-time price preview from DEX
 - Slippage protection
+- Password prompt for hybrid users (with caching!)
 
 ### Sell Tokens  
 - Quick sell: 25%, 50%, 75%, 100%
-- Custom amount support
+- Custom amount support (specify exact tokens)
 - Only verified tokens shown
 - Transaction confirmation
+- Password prompt for hybrid users (with caching!)
+
+### Send Tokens
+- Native MON transfers
+- ERC20 token transfers
+- QR code generation for receiving
+- Password support for hybrid encryption
 
 ## Portfolio
 
@@ -29,14 +37,29 @@
 
 ## Security
 
-### Two Modes
-- **Quick Mode**: Fast, master key only
-- **Secure Mode**: Passphrase protected
+### Three Encryption Modes
+- **Standard Mode**: Fast, master key only (testnet)
+- **Password Mode**: Legacy passphrase protection
+- **Hybrid Mode**: RSA + AES, true zero-knowledge (RECOMMENDED!)
 
-### Encryption
-- AES-128 (Fernet)
-- Scrypt key derivation
-- Zero-knowledge passphrases
+### Hybrid Encryption Features
+- RSA-4096 keypair generation
+- AES-256-GCM for wallet encryption
+- Password-protected RSA private key
+- Server CANNOT decrypt your wallet
+- Password caching options (your choice!)
+- RSA key backup (text + file)
+
+### Password Caching
+- "Just This Once" - Password for single transaction
+- "Remember for Session" - Cache until bot restart
+- You decide the balance between security and convenience
+
+### Special Protection
+- Show private key ALWAYS requires fresh password
+- No cache used for viewing keys (extra security)
+- Auto-delete password messages
+- 60-second auto-delete for displayed keys
 
 ## Token Discovery
 
